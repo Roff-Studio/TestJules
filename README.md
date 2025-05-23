@@ -28,3 +28,23 @@ All API keys and sensitive credentials for this project are stored in a file nam
 2.  Once generated, these keys should also be securely stored in the `.env` file.
 
 General security advice: "Always keep your API keys and private keys confidential. Do not share them publicly or commit them to version control."
+
+## Core Modules
+
+*   **`src/api_clients.py`**: Manages communication with external APIs, currently including xAI (Grok) for Twitter data and a placeholder for Pump.fun.
+*   **`src/database_manager.py`**: Handles all database interactions, including initialization, table creation (coins, snapshots), and data storage for memecoin information and their metrics.
+*   **`src/utils/error_handling.py`**: Provides utility functions for error handling, such as a retry decorator for API calls and global logging setup (to `logs/app.log` and console).
+*   **`src/utils/generate_pumpfun_keys.py`**: (Placeholder) Intended to generate Pump.fun API keys and associated wallet information.
+
+## Database Schema
+
+The project uses an SQLite database (`data/memecoins.db`) to store information about memecoins and their performance snapshots.
+
+*   **`coins` Table**:
+    *   Stores primary information about each discovered memecoin.
+    *   Key fields include `token_address` (unique identifier), `name`, `symbol`, `creation_timestamp`, and `source_twitter_handle`.
+
+*   **`snapshots` Table**:
+    *   Stores periodic snapshots of various metrics for each coin.
+    *   Linked to the `coins` table via a `coin_id` foreign key.
+    *   Key fields include `timestamp`, `market_cap`, social media engagement counts (`reply_count_x`, `retweet_count_x`, `mention_count_xai`), and Pump.fun specific data (`pumpfun_volume_usd`, `pumpfun_market_cap_usd`).
