@@ -31,10 +31,12 @@ General security advice: "Always keep your API keys and private keys confidentia
 
 ## Core Modules
 
-*   **`src/api_clients.py`**: Manages communication with external APIs, currently including xAI (Grok) for Twitter data and a placeholder for Pump.fun.
-*   **`src/database_manager.py`**: Handles all database interactions, including initialization, table creation (coins, snapshots), and data storage for memecoin information and their metrics.
-*   **`src/utils/error_handling.py`**: Provides utility functions for error handling, such as a retry decorator for API calls and global logging setup (to `logs/app.log` and console).
-*   **`src/utils/generate_pumpfun_keys.py`**: (Placeholder) Intended to generate Pump.fun API keys and associated wallet information.
+*   **`main.py`**: The main entry point of the application. It orchestrates the entire workflow from fetching data to storing it in the database.
+*   **`src/api_clients.py`**: Manages communication with external APIs. Currently includes `XAIClient` for fetching Twitter data via Grok and a placeholder `PumpFunClient`.
+*   **`src/database_manager.py`**: Handles all database interactions with the SQLite database (`data/memecoins.db`), including initialization, table creation (`coins`, `snapshots`), and CRUD operations for memecoin information and their metrics.
+*   **`src/utils/parser.py`**: Responsible for parsing the raw content received from the xAI API. It attempts to extract structured data (JSON) about memecoins and falls back to text-based analysis (e.g., using regular expressions for Solana addresses) if JSON is not found or is malformed. Standardizes extracted data for database insertion.
+*   **`src/utils/error_handling.py`**: Provides utility functions for robust application behavior, including a retry decorator (`@retry_on_error`) for API calls and a global logging setup (outputting to `logs/app.log` and the console).
+*   **`src/utils/generate_pumpfun_keys.py`**: (Placeholder) Intended to assist in generating Pump.fun API keys and associated wallet information.
 
 ## Database Schema
 
@@ -48,3 +50,31 @@ The project uses an SQLite database (`data/memecoins.db`) to store information a
     *   Stores periodic snapshots of various metrics for each coin.
     *   Linked to the `coins` table via a `coin_id` foreign key.
     *   Key fields include `timestamp`, `market_cap`, social media engagement counts (`reply_count_x`, `retweet_count_x`, `mention_count_xai`), and Pump.fun specific data (`pumpfun_volume_usd`, `pumpfun_market_cap_usd`).
+
+## Main Workflow
+
+The `main.py` script executes the core logic of the application in a sequence:
+
+1.  **Initialization**:
+    *   Sets up global logging (from `src.utils.error_handling`).
+    *   Loads environment variables from the `.env` file (e.g., API keys).
+    *   Initializes the SQLite database and creates tables if they don't exist (using `src.database_manager.initialize_database`).
+
+2.  **Data Fetching**:
+    *   An instance of `XAIClient` (from `src.api_clients`) is created.
+    *   It fetches data from the xAI API using a predefined query designed to find new and trending Solana memecoins. This operation is automatically retried on failure, thanks to the `@retry_on_error` decorator.
+
+3.  **Data Parsing**:
+    *   The raw response content from xAI is passed to the `parse_xai_response_content` function in `src.utils.parser.py`.
+    *   This function attempts to extract structured information about potential memecoins, first by trying to parse the content as JSON, and then by falling back to text-based analysis (e.g., regex for Solana addresses) if necessary. It standardizes the data into a list of dictionaries.
+
+4.  **Data Storage**:
+    *   The script iterates through the list of parsed coin data.
+    *   For each potential coin:
+        *   `database_manager.add_coin` is called to add the coin to the `coins` table (or update it if it already exists based on the unique `token_address`). This function returns the coin's database ID.
+        *   If a valid coin ID is obtained, `database_manager.add_snapshot` is called to record a new entry in the `snapshots` table. Currently, this snapshot primarily notes that the coin was mentioned by xAI (`mention_count_xai=1`).
+
+5.  **Logging and Conclusion**:
+    *   Throughout the process, detailed logs are generated.
+    *   The script concludes by logging a summary of the cycle, including counts of processed items, coins added/confirmed, and snapshots created.
+    *   Currently, the application performs a single cycle of these operations when `main.py` is executed. Future development may involve scheduling or continuous operation.
